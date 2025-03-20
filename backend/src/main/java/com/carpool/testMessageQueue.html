@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Notification Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+</head>
+<body>
+<h1>WebSocket Notification Test</h1>
+<input type="text" id="eventId" placeholder="Enter Event ID">
+<button id="connectBtn">Connect</button>
+<button id="disconnectBtn" disabled>Disconnect</button>
+<h2>Notifications</h2>
+<ul id="notifications"></ul>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        const eventId = document.getElementById("eventId").value;
+        if (!eventId) {
+            alert("Please enter an Event ID");
+            return;
+        }
+
+        const socket = new SockJS('http://backend:8080/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, () => {
+            console.log("Connected to WebSocket server");
+
+            // Subscribe to notifications for the given event ID
+            stompClient.subscribe(`/topic/notifications/${eventId}`, (message) => {
+                if (message.body) {
+                    displayNotification(message.body);
+                }
+            });
+
+            document.getElementById("connectBtn").disabled = true;
+            document.getElementById("disconnectBtn").disabled = false;
+        }, (error) => {
+            console.error("Error connecting to WebSocket:", error);
+        });
+    }
+
+    function disconnect() {
+        if (stompClient) {
+            stompClient.disconnect(() => {
+                console.log("Disconnected from WebSocket server");
+                document.getElementById("connectBtn").disabled = false;
+                document.getElementById("disconnectBtn").disabled = true;
+            });
+        }
+    }
+
+    function displayNotification(message) {
+        const notificationsList = document.getElementById("notifications");
+        const listItem = document.createElement("li");
+        listItem.textContent = message;
+        notificationsList.appendChild(listItem);
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", connect);
+    document.getElementById("disconnectBtn").addEventListener("click", disconnect);
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.carpool.mapper.ChatroomMapper">
+
+    <!-- Chatroom CRUD -->
+    <insert id="insertChatroom" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO Chatroom (name, is_event_chatroom)
+        VALUES (#{name}, #{isEventChatroom})
+    </insert>
+
+    <select id="selectChatroomById" resultType="com.carpool.entity.Chatroom">
+        SELECT * FROM Chatroom WHERE id = #{id}
+    </select>
+
+    <select id="selectAllChatrooms" resultType="com.carpool.entity.Chatroom">
+        SELECT * FROM Chatroom
+    </select>
+
+    <update id="updateChatroom">
+        UPDATE Chatroom
+        SET name = #{name}, is_closed = #{isClosed}, is_event_chatroom = #{isEventChatroom}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteChatroom">
+        DELETE FROM Chatroom WHERE id = #{id}
+    </delete>
+
+    <!-- UserChatroom operations -->
+    <insert id="insertUserChatroom">
+        INSERT INTO user_chatroom (user_id, chatroom_id, join_chatroom_time)
+        VALUES (#{userId}, #{chatroomId}, #{joinChatroomTime})
+    </insert>
+
+    <select id="selectUsersByChatroomId" resultType="com.carpool.entity.UserChatroom">
+        SELECT * FROM user_chatroom WHERE chatroom_id = #{chatroomId}
+    </select>
+
+    <delete id="deleteUserChatroom">
+        DELETE FROM user_chatroom WHERE chatroom_id = #{chatroomId} AND user_id = #{userId}
+    </delete>
+
+    <!-- Message operations -->
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO Message (sender_id, content, create_time, chatroom_id)
+        VALUES (#{sender.id}, #{content}, #{createTime}, #{chatroom.id})
+    </insert>
+
+    <delete id="deleteMessagesByChatroomId">
+        DELETE FROM Message WHERE chatroom_id = #{chatroomId}
+    </delete>
+
+
+
+
+    <resultMap id="messageMap" type="com.carpool.entity.Message">
+        <id column="id" property="id"/>
+        <result column="content" property="content" />
+        <result column="create_time" property="createTime"/>
+
+        <association property="sender" javaType="com.carpool.entity.User">
+            <id column="senderId" property="id" />
+            <result column="senderName" property="name"/>
+        </association>
+
+        <association property="chatroom" javaType="com.carpool.entity.Chatroom">
+            <id column="chatroomId" property="id" />
+        </association>
+    </resultMap>
+
+    <select id="selectMessagesByChatroomId" resultMap="messageMap">
+        select m.id, m.content, m.create_time,
+        u.id as senderId, u.name as senderName,
+        c.id as chatroomId
+        from message m
+        left join user u on m.sender_id = u.id
+        left join chatroom c on c.id = #{chatroomId}
+        where m.chatroom_id = #{chatroomId}
+    </select>
+
+
+
+</mapper>

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: carpool_app
+  datasource:
+    # url: jdbc:mysql://localhost:3306/carpool_app  docker裡面localhost為container本身，非host或其他container，container之間用容器名稱傳data
+    url: jdbc:mysql://mysql:3306/carpool_app  
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: user
+    password: 1234
+  data:
+    redis:
+      # host: backend
+      host: redis
+      port: 6379
+      password: 1234
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 100
+  jpa:
+    hibernate:
+      ddl-auto: create  # update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    org.springframework.jdbc.support.jdbcTransactionManager: debug
+
+pagehelper:
+  helperDialect: mysql
+  reasonable: true
+  supportMethodsArguments: true
+

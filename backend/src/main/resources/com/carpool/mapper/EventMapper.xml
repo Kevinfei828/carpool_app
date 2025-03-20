@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.carpool.mapper.EventMapper">
+
+    <resultMap id="EventResultMap" type="com.carpool.entity.Event">
+        <id column="id" property="id" />
+        <result column="eventName" property="eventName" />
+        <result column="startTime" property="startTime" />
+        <result column="isSelfDrive" property="selfDrive" />
+        <result column="maxAvailableSeat" property="maxAvailableSeat" />
+        <result column="currentAvailableSeat" property="currentAvailableSeat" />
+        <result column="isCompleted" property="completed" />
+        <result column="isDismissed" property="dismissed"/>
+
+        <association property="initiator" javaType="com.carpool.entity.User">
+            <result column="initiatorId" property="id"/>
+            <result column="initiatorName" property="name" />
+        </association>
+        <association property="startLocation" javaType="com.carpool.entity.Location">
+            <result column="startLocationName" property="name_cn" />
+        </association>
+        <association property="endLocation" javaType="com.carpool.entity.Location">
+            <result column="endLocationName" property="name_cn" />
+        </association>
+        <association property="startCity" javaType="com.carpool.entity.City">
+            <result column="startCityName" property="name_cn" />
+        </association>
+        <association property="endCity" javaType="com.carpool.entity.City">
+            <result column="endCityName" property="name_cn" />
+        </association>
+
+        <collection property="carpoolEvents" ofType="com.carpool.entity.CarpoolEvent"
+                    select="selectCarpoolEventsByEventId" column="id"/>
+    </resultMap>
+
+    <resultMap id="CarpoolEventResultMapHelper" type="com.carpool.entity.CarpoolEvent">
+        <association property="attendant" javaType="com.carpool.entity.User">
+            <result column="attendantId" property="id"/>
+            <result column="attendantName" property="name"/>
+        </association>
+        <association property="getOnLocation" javaType="com.carpool.entity.Location">
+            <result column="getOnLocationName" property="name_cn" />
+        </association>
+        <association property="getOffLocation" javaType="com.carpool.entity.Location">
+            <result column="getOffLocationName" property="name_cn" />
+        </association>
+    </resultMap>
+
+
+
+    <select id="searchEventByCityAndLocationId" resultMap="EventResultMap">
+        select
+        e.id as id,
+        e.event_name as eventName,
+        e.start_time as startTime,
+        e.is_self_drive as isSelfDrive,
+        e.start_location_id as startLocationId,
+        e.start_city_id as startCityId,
+        e.end_location_id as endLocationId,
+        e.end_city_id as endCityId,
+        e.max_available_seat as maxAvailableSeat,
+        e.current_available_seat as currentAvailableSeat,
+        e.is_completed as isCompleted,
+        e.is_dismissed as isDismissed,
+
+        sl.name_cn as startLocationName,
+        el.name_cn as endLocationName,
+        sc.name_cn as startCityName,
+        ec.name_cn as endCityName,
+
+        u.name as initiatorName,
+        u.id as initiatorId
+
+        from Event e
+        left join User u on e.initiator_id = u.id
+        left join Location sl on e.start_location_id = sl.id
+        left join Location el on e.end_location_id = el.id
+        left join City sc on e.start_city_id = sc.id
+        left join City ec on e.end_city_id = ec.id
+
+        <where>
+            <if test="startCityId != null">
+                e.start_city_id = #{startCityId}
+            </if>
+            <if test="endCityId != null">
+                AND e.end_city_id = #{endCityId}
+            </if>
+            <if test="startLocationIds != null and startLocationIds.length > 0">
+                AND e.start_location_id IN
+                <foreach collection="startLocationIds" item="startLocationId" open="(" separator="," close=")">
+                    #{startLocationId}
+                </foreach>
+            </if>
+            <if test="endLocationIds != null and endLocationIds.length > 0">
+                AND e.end_location_id IN
+                <foreach collection="endLocationIds" item="endLocationId" open="(" separator="," close=")">
+                    #{endLocationId}
+                </foreach>
+            </if>
+            <if test="startTime != null">
+                AND e.start_time >= #{startTime}
+            </if>
+        </where>
+        group by e.id
+        ORDER BY e.start_time ASC
+
+    </select>
+
+    <select id="selectCarpoolEventsByEventId" resultMap="CarpoolEventResultMapHelper">
+        SELECT
+        ce.attendant_id AS attendantId,
+        uce.name AS attendantName,
+        lonce.name_cn AS getOnLocationName,
+        loffce.name_cn AS getOffLocationName
+        FROM carpool_event ce
+        LEFT JOIN User uce ON ce.attendant_id = uce.id
+        LEFT JOIN Location lonce ON ce.get_on_location = lonce.id
+        LEFT JOIN Location loffce ON ce.get_off_location = loffce.id
+        WHERE ce.event_id = #{eventId}
+    </select>
+
+
+
+
+    <select id="searchLocationIdsByName" resultType="java.lang.Long" parameterType="java.util.List">
+        select id from location where name_cn LIKE concat(
+        <foreach item="token" collection="tokens" separator=",'%'," open="'%'," close=",'%'">
+            #{token}
+        </foreach>
+        )
+    </select>
+
+    <update id="updateEventByJoiner">
+        update carpool_event
+        <set>
+            <if test="attendantNumber != null">
+                attendant_number = #{attendantNumber},
+            </if>
+            <if test="getOnTime != null">
+                get_on_time = #{getOnTime},
+            </if>
+            <if test="getOnLocation != null">
+                get_on_location = #{getOnLocation},
+            </if>
+            <if test="getOffLocation != null">
+                get_off_location = #{getOffLocation}
+            </if>
+        </set>
+        where attendant_id = #{attendant} and event_id = #{event}
+    </update>
+
+    <update id="updateEventByInitiator">
+        update Event
+        <set>
+            <if test="eventName != null">
+                event_name = #{eventName},
+            </if>
+            <if test="startTime != null">
+                start_time = #{startTime},
+            </if>
+            <if test="isSelfDrive != null">
+                is_self_drive = #{isSelfDrive},
+            </if>
+            <if test="startLocation != null">
+                start_location_id = #{startLocation},
+            </if>
+            <if test="startCity != null">
+                start_city_id = #{startCity}
+            </if>
+            <if test="endLocation != null">
+                end_location_id = #{endLocation}
+            </if>
+            <if test="endCity != null">
+                end_city_id = #{endCity}
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <insert id="createEvent" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        insert into Event (
+            initiator_id,
+            event_name,
+            start_time, 
+            is_self_drive, 
+            start_location_id, 
+            start_city_id, 
+            end_location_id, 
+            end_city_id, 
+            max_available_seat, 
+            current_available_seat
+        )
+        values (
+            #{initiator.id},
+            #{eventName},
+            #{startTime}, 
+            #{isSelfDrive}, 
+            #{startLocation.id},
+            #{startCity.id},
+            #{endLocation.id},
+            #{endCity.id},
+            #{maxAvailableSeat}, 
+            #{maxAvailableSeat}
+        )
+    </insert>
+
+    <resultMap id="LocationResultMap" type="com.carpool.entity.Location">
+        <id column="id" property="id" />
+        <result column="name_cn" property="name_cn" />
+        <result column="name_en" property="name_en" />
+        <association property="city" javaType="com.carpool.entity.City">
+            <id column="city_id" property="id" />
+        </association>
+    </resultMap>
+
+    <resultMap id="CarpoolEventResultMap" type="com.carpool.entity.CarpoolEvent">
+<!--        <id column="id" property="id" />-->
+<!--        <result column="attendant_id" property="attendant" />-->
+<!--        <result column="event_id" property="event" />-->
+        <result column="attendant_number" property="attendantNumber" />
+        <result column="get_on_time" property="getOnTime" />
+
+        <association property="id" javaType="com.carpool.entity.CarpoolEventKey">
+            <id column="event_id" property="eventId" />
+            <id column="attendant_id" property="userId" />
+        </association>
+        <association property="attendant" javaType="com.carpool.entity.User">
+            <id column="attendant_id" property="id" />
+        </association>
+        <association property="event" javaType="com.carpool.entity.Event">
+            <id column="event_id" property="id" />
+        </association>
+
+        <association property="getOnLocation" columnPrefix="getOn_" resultMap="LocationResultMap" />
+        <association property="getOffLocation" columnPrefix="getOff_" resultMap="LocationResultMap" />
+    </resultMap>
+    <select id="searchCarpoolEventById" resultMap="CarpoolEventResultMap">
+        select
+        ce.attendant_id as attendant_id,
+        ce.event_id as event_id,
+        ce.attendant_number as attendant_number,
+        ce.get_on_time as get_on_time,
+
+        getOn.id as getOn_id,
+        getOn.city_id as getOn_city_id,
+        getOn.name_cn as getOn_name_cn,
+        getOn.name_en as getOn_name_en,
+
+        getOff.id as getOff_id,
+        getOff.city_id as getOff_city_id,
+        getOff.name_cn as getOff_name_cn,
+        getOff.name_en as getOff_name_en
+
+        from carpool_event ce
+        left join Location getOn on ce.get_on_location = getOn.id
+        left join Location getOff on ce.get_off_location = getOff.id
+
+        where ce.attendant_id = #{userId} and ce.event_id = #{eventId}
+    </select>
+
+    <select id="searchEventById" resultMap="EventResultMap">
+        select
+        e.id as id,
+        e.event_name as eventName,
+        e.start_time as startTime,
+        e.is_self_drive as isSelfDrive,
+        e.start_location_id as startLocationId,
+        e.start_city_id as startCityId,
+        e.end_location_id as endLocationId,
+        e.end_city_id as endCityId,
+        e.max_available_seat as maxAvailableSeat,
+        e.current_available_seat as currentAvailableSeat,
+        e.is_completed as isCompleted,
+        e.is_dismissed as isDismissed,
+        sl.name_cn as startLocationName,
+        el.name_cn as endLocationName,
+        sc.name_cn as startCityName,
+        ec.name_cn as endCityName,
+        u.name as initiatorName,
+        u.id as initiatorId,
+        gol.name_cn as getOnLocationName,
+        goffl.name_cn as getOffLocationName,
+        uce.id as attendantId,
+        uce.name as attendantName
+        from Event e
+        left join User u on e.initiator_id = u.id
+        left join Location sl on e.start_location_id = sl.id
+        left join Location el on e.end_location_id = el.id
+        left join City sc on e.start_city_id = sc.id
+        left join City ec on e.end_city_id = ec.id
+        left join carpool_event ce on e.id = ce.event_id
+        left join Location gol on ce.get_on_location = gol.id
+        left join Location goffl on ce.get_off_location = goffl.id
+        left join User uce on ce.attendant_id = uce.id
+
+
+        where e.id = #{eventId}
+    </select>
+
+
+    <select id="getAllEvents" resultMap="EventResultMap">
+        select
+        e.id as id,
+        e.event_name as eventName,
+        e.start_time as startTime,
+        e.is_self_drive as isSelfDrive,
+        e.start_location_id as startLocationId,
+        e.start_city_id as startCityId,
+        e.end_location_id as endLocationId,
+        e.end_city_id as endCityId,
+        e.max_available_seat as maxAvailableSeat,
+        e.current_available_seat as currentAvailableSeat,
+        e.is_completed as isCompleted,
+        e.is_dismissed as isDismissed,
+        sl.name_cn as startLocationName,
+        el.name_cn as endLocationName,
+        sc.name_cn as startCityName,
+        ec.name_cn as endCityName,
+        u.name as initiatorName,
+        u.id as initiatorId,
+        gol.name_cn as getOnLocationName,
+        goffl.name_cn as getOffLocationName,
+        uce.id as attendantId,
+        uce.name as attendantName
+        from Event e
+        left join User u on e.initiator_id = u.id
+        left join Location sl on e.start_location_id = sl.id
+        left join Location el on e.end_location_id = el.id
+        left join City sc on e.start_city_id = sc.id
+        left join City ec on e.end_city_id = ec.id
+        left join carpool_event ce on e.id = ce.event_id
+        left join Location gol on ce.get_on_location = gol.id
+        left join Location goffl on ce.get_off_location = goffl.id
+        left join User uce on ce.attendant_id = uce.id
+
+
+        where e.id in (select event_id from carpool_event ce where ce.attendant_id = #{userId})
+        ORDER BY e.start_time ASC;
+
+    </select>
+
+    <select id="getEvent" resultMap="EventResultMap">
+        select
+        e.id as id,
+        e.event_name as eventName,
+        e.start_time as startTime,
+        e.is_self_drive as isSelfDrive,
+        e.start_location_id as startLocationId,
+        e.start_city_id as startCityId,
+        e.end_location_id as endLocationId,
+        e.end_city_id as endCityId,
+        e.max_available_seat as maxAvailableSeat,
+        e.current_available_seat as currentAvailableSeat,
+        e.is_completed as isCompleted,
+        e.is_dismissed as isDismissed,
+        sl.name_cn as startLocationName,
+        el.name_cn as endLocationName,
+        sc.name_cn as startCityName,
+        ec.name_cn as endCityName,
+        u.name as initiatorName,
+        u.id as initiatorId,
+        gol.name_cn as getOnLocationName,
+        goffl.name_cn as getOffLocationName,
+        uce.id as attendantId,
+        uce.name as attendantName
+        from Event e
+        left join User u on e.initiator_id = u.id
+        left join Location sl on e.start_location_id = sl.id
+        left join Location el on e.end_location_id = el.id
+        left join City sc on e.start_city_id = sc.id
+        left join City ec on e.end_city_id = ec.id
+        left join carpool_event ce on e.id = ce.event_id
+        left join Location gol on ce.get_on_location = gol.id
+        left join Location goffl on ce.get_off_location = goffl.id
+        left join User uce on ce.attendant_id = uce.id
+
+
+        where e.id = #{eventId}
+        ORDER BY e.start_time ASC;
+
+    </select>
+
+    <resultMap id="UserBasicInfoMap" type="com.carpool.entity.DTO.UserBasicInfoDTO">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="phone_number" property="phoneNumber" />
+        <result column="email_address" property="emailAddress" />
+    </resultMap>
+
+
+    <select id="getEventUser" resultMap="UserBasicInfoMap">
+        select id, name, phone_number, email_address from User u where u.id in
+        (select attendant_id from carpool_event ce where ce.event_id = #{eventId})
+    </select>
+
+
+
+</mapper>

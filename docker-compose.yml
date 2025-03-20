@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # MySQL 服務
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: carpool_app
+      MYSQL_USER: user
+      MYSQL_PASSWORD: 1234
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - mynetwork
+    command: 
+      - --lower_case_table_names=1   # 不區分大小寫
+    # healthcheck:
+    #   test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    #   interval: 5s
+    #   timeout: 10s
+    #   retries: 10
+
+  # Redis 服務
+  redis:
+    image: redis:7.0
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: 1234
+    networks:
+      - mynetwork
+    # healthcheck:
+    #   test: ["CMD", "redis-cli", "ping"]
+    #   interval: 5s
+    #   timeout: 10s
+    #   retries: 10
+
+  # RabbitMQ 服務
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"  # RabbitMQ 的 AMQP 端口
+      - "15672:15672"  # RabbitMQ 的管理界面端口
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - mynetwork
+
+  # Spring Boot 後端服務
+  backend:
+    build:
+      context: ./backend  # Spring Boot 專案的目錄
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/carpool_app
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: 1234
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: 1234
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: admin
+      SPRING_RABBITMQ_PASSWORD: admin
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create  # create: 每次重開都會刷新db並create table
+      SPRING_JPA_SHOW_SQL: true
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: true
+      MYBATIS_CONFIGURATION_LOG_IMPL: org.apache.ibatis.logging.stdout.StdOutImpl
+      MYBATIS_CONFIGURATION_MAP_UNDERSCORE_TO_CAMEL_CASE: true
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_JDBC_SUPPORT_JDBC_TRANSACTION_MANAGER: debug
+      PAGEHELPER_HELPERDIALECT: mysql
+      PAGEHELPER_REASONABLE: true
+      PAGEHELPER_SUPPORTMETHODSARGUMENTS: true
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+    networks:
+      - mynetwork
+    command: >
+      sh -c "while ! nc -z mysql 3306; do sleep 2; done;
+      java -jar /app/app.jar"
+    
+
+  # React 前端服務
+  frontend:
+    build:
+      context: ./frontend  # React 專案的目錄
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - mynetwork
+
+# 定義網路
+networks:
+  mynetwork:
+    driver: bridge
+
+# 定義卷
+volumes:
+  mysql_data:
